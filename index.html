@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stick RPG 5 - Dev</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background-color: #111;
+    color: white;
+    text-align: center;
+    margin: 0;
+    padding: 0;
+  }
+  #gameContainer {
+    display: none;
+    margin-top: 20px;
+  }
+  canvas {
+    background-color: #222;
+    border: 2px solid white;
+  }
+  button {
+    margin: 5px;
+    padding: 10px 15px;
+    font-size: 16px;
+    background-color: #444;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  button:hover {
+    background-color: #666;
+  }
+</style>
+</head>
+<body>
+  <h1>Stick RPG 5 - Dev</h1>
+  <div id="menuInicial">
+    <button onclick="novoJogo()">Novo Jogo</button>
+    <button onclick="carregarJogo()">Carregar Jogo</button>
+  </div>
+
+  <div id="criacaoPersonagem" style="display:none;">
+    <h2>Criação de Personagem</h2>
+    <input id="nome" placeholder="Seu nome"><br><br>
+    <button onclick="selecionarClasse('guerreiro')">Guerreiro</button>
+    <button onclick="selecionarClasse('mago')">Mago</button>
+    <button onclick="selecionarClasse('arqueiro')">Arqueiro</button>
+  </div>
+
+  <div id="gameContainer">
+    <canvas id="gameCanvas" width="400" height="300"></canvas>
+    <div>
+      <button onclick="explorar()">Explorar</button>
+      <button onclick="viajar()">Viajar</button>
+      <button onclick="mostrarStatus()">Status</button>
+      <button onclick="abrirInventario()">Inventário</button>
+      <button onclick="salvarJogo()">Salvar Jogo</button>
+      <button onclick="sairJogo()">Sair</button>
+    </div>
+    <p id="log"></p>
+  </div>
+
+<script>
+let jogador = null;
+let biomaAtual = "Floresta";
+let monstros = {};
+const biomas = ["Floresta","Lava","Gelo","Deserto","Sombrio"];
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+function gerarMonstros() {
+  biomas.forEach(b => {
+    monstros[b] = [];
+    for (let i=0; i<100; i++) {
+      monstros[b].push({
+        nome: `${b}-Monstro${i+1}`,
+        vida: Math.floor(Math.random()*50+50),
+        ataque: Math.floor(Math.random()*10+5)
+      });
+    }
+  });
+}
+gerarMonstros();
+
+function novoJogo() {
+  document.getElementById("menuInicial").style.display="none";
+  document.getElementById("criacaoPersonagem").style.display="block";
+}
+function carregarJogo() {
+  let save = localStorage.getItem("stickrpgsave");
+  if (save) {
+    jogador = JSON.parse(save);
+    iniciarJogo();
+  } else {
+    alert("Nenhum jogo salvo encontrado!");
+  }
+}
+function selecionarClasse(classe) {
+  const nome = document.getElementById("nome").value.trim();
+  if (!nome) return alert("Digite um nome!");
+  jogador = {
+    nome, classe, vida:100, maxVida:100, ataque:10, nivel:1, exp:0, inventario:[], bioma:"Floresta"
+  };
+  iniciarJogo();
+}
+function iniciarJogo() {
+  document.getElementById("criacaoPersonagem").style.display="none";
+  document.getElementById("menuInicial").style.display="none";
+  document.getElementById("gameContainer").style.display="block";
+  desenhar();
+  log(`Bem-vindo(a), ${jogador.nome} o ${jogador.classe}!`);
+}
+function desenhar() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "lightgray";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "black";
+  // stickman
+  let x = canvas.width/2, y = canvas.height/2;
+  ctx.beginPath();
+  ctx.arc(x, y-30, 10, 0, Math.PI*2); ctx.stroke();
+  ctx.moveTo(x, y-20); ctx.lineTo(x, y+20); ctx.stroke();
+  ctx.moveTo(x, y-10); ctx.lineTo(x-20, y+10); ctx.moveTo(x, y-10); ctx.lineTo(x+20, y+10); ctx.stroke();
+  ctx.moveTo(x, y+20); ctx.lineTo(x-10, y+40); ctx.moveTo(x, y+20); ctx.lineTo(x+10, y+40); ctx.stroke();
+  // arma visual simples
+  if (jogador.classe=="guerreiro") {
+    ctx.moveTo(x+20,y); ctx.lineTo(x+40,y-10); ctx.strokeStyle="silver"; ctx.stroke();
+  } else if (jogador.classe=="mago") {
+    ctx.moveTo(x+20,y); ctx.lineTo(x+20,y-20); ctx.strokeStyle="purple"; ctx.stroke();
+  } else if (jogador.classe=="arqueiro") {
+    ctx.beginPath(); ctx.arc(x+20,y,10,Math.PI/2,-Math.PI/2); ctx.strokeStyle="brown"; ctx.stroke();
+  }
+  ctx.strokeStyle="black";
+}
+
+function explorar() {
+  const inimigo = monstros[biomaAtual][Math.floor(Math.random()*100)];
+  log(`Você encontrou um ${inimigo.nome}!`);
+  combate(inimigo);
+}
+function combate(inimigo) {
+  while (jogador.vida>0 && inimigo.vida>0) {
+    inimigo.vida -= jogador.ataque;
+    if (inimigo.vida<=0) {
+      jogador.exp+=10;
+      log(`Você derrotou ${inimigo.nome}! +10 EXP`);
+      if (jogador.exp>=100) {
+        jogador.nivel++;
+        jogador.exp=0;
+        jogador.maxVida+=20;
+        jogador.vida=jogador.maxVida;
+        log(`Você subiu para o nível ${jogador.nivel}!`);
+      }
+      return;
+    }
+    jogador.vida -= inimigo.ataque;
+  }
+  if (jogador.vida<=0) {
+    log("Você foi derrotado! Revivendo com 50% de vida...");
+    jogador.vida = jogador.maxVida/2;
+  }
+}
+function viajar() {
+  let escolha = prompt("Escolha um bioma: " + biomas.join(", "));
+  if (biomas.includes(escolha)) {
+    biomaAtual = escolha;
+    log("Você viajou para o bioma de " + escolha + ".");
+  } else log("Bioma inválido!");
+}
+function mostrarStatus() {
+  log(`Nome: ${jogador.nome} | Classe: ${jogador.classe} | Vida: ${jogador.vida}/${jogador.maxVida} | Nível: ${jogador.nivel} | Bioma: ${biomaAtual}`);
+}
+function abrirInventario() {
+  log("Inventário: " + (jogador.inventario.length? jogador.inventario.join(", "):"vazio"));
+}
+function salvarJogo() {
+  localStorage.setItem("stickrpgsave", JSON.stringify(jogador));
+  log("Jogo salvo com sucesso!");
+}
+function sairJogo() {
+  salvarJogo();
+  location.reload();
+}
+function log(msg) {
+  document.getElementById("log").innerText = msg;
+}
+</script>
+</body>
+</html>
